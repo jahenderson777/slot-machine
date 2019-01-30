@@ -17,9 +17,9 @@
    :longitude (rand-int 500)})
 
 (def drops
-  (atom (map-indexed (fn [idx x]
-                       (assoc x :roots_drop_order idx))
-                     (repeatedly 10 random-drop))))
+  (atom (vec (map-indexed (fn [idx x]
+                            (assoc x :roots_drop_order idx))
+                          (repeatedly 10 random-drop)))))
 
 (def hub (random-drop))
 
@@ -124,7 +124,7 @@
   (dispatch tx tube (conj reply-v {:round @drops
                                    :hub hub
 
-                                   :route @best-route})))
+                                   :route (:route @best-route)})))
 
 (defmethod handle-event :load-data
   [tube [_ _ reply-v]]

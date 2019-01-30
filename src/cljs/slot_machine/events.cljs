@@ -5,7 +5,7 @@
    ))
 
 (def default-db
-  {:name "re-frame"})
+  {})
 
 (reg-event-db
  ::initialize-db
@@ -28,7 +28,7 @@
  :server
  send-to-server
  (fn [db [_ _ _ name]]
-   (.log js/console (str "Hello " name))
+   (.log js/console (str "sending to server " name))
    db))
 
 (tubes/create! tube)
