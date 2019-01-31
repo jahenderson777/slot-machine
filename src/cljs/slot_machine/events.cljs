@@ -13,7 +13,7 @@
   default-db))
 
 (defn on-receive [event-v]
-  ;(.log js/console "received from server:" (str event-v))
+  (.log js/console "received from server:" (str event-v))
   (dispatch event-v))
 
 (def tube (tubes/tube (str "ws://localhost:9090/ws") on-receive))

@@ -6,6 +6,7 @@
                  [compojure "1.5.0"]
                  [http-kit "2.3.0"]
                  [pneumatic-tubes "0.3.0"]
+                 [cljsjs/leaflet "1.2.0-0"]
                  [org.clojure/core.async "0.4.490"]
                  [org.clojure/math.numeric-tower "0.0.4"]]
 
@@ -28,7 +29,7 @@
                    [cider/piggieback "0.3.10"]]
 
     :plugins      [[lein-figwheel "0.5.18"]]}
--
+
    :prod { }
    :uberjar {:source-paths ["env/prod/clj"]
              :omit-source  true

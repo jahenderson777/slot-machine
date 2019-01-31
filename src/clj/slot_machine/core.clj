@@ -222,5 +222,5 @@
   (GET "/ws" [] (websocket-handler (receiver {:server #'handle-event})))
   (resources "/"))
 
-(defn -main [& args]
+(defn -main [& args]q
   (def stop-server (run-server (bound-fn [req] (routes req)) {:port 9090})))
