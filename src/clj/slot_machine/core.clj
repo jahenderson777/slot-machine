@@ -19,7 +19,7 @@
 (def drops
   (atom (vec (map-indexed (fn [idx x]
                             (assoc x :roots_drop_order idx))
-                          (repeatedly 10 random-drop)))))
+                          (repeatedly 4 random-drop)))))
 
 (def hub (random-drop))
 
@@ -30,7 +30,7 @@
              (subvec v (inc n)))]))
 
 (defn insert-at [row-vec pos item]
-  (println row-vec pos item)
+  ;(println row-vec pos item)
   (apply conj (subvec row-vec 0 pos) item (subvec row-vec pos)))
 
 (defn distance-between [x1 y1 x2 y2]
@@ -67,6 +67,63 @@
                (if (< (:cost new) (:cost best))
                  new
                  best))))))
+
+
+(defn slot-in-last [matrix drops route new-idx hub-idx]
+  (println "slot-in-last" route new-idx hub-idx)
+  (loop [i 0
+         best (cost-route matrix (insert-at route 0 new-idx) hub-idx hub-idx)]
+    (if (= i (count route))
+      best
+      (let [new (cost-route matrix (insert-at route i new-idx) hub-idx hub-idx)]
+        (recur (inc i)
+               (if (< (:cost new) (:cost best))
+                 new
+                 best))))))
+
+(defn build-route [matrix drops order hub-idx]
+  ;(throw (Exception. "sldjfh"))
+  (println "build-route3vxxxx22222" order hub-idx )
+  (try
+    (let [new-route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+          (reduce (fn [route next]
+                    (:route (slot-in-last matrix drops route next hub-idx)))
+                  [hub-idx]
+                  order)
+          ret {:route new-route
+               :cost (cost-route matrix new-route hub-idx hub-idx)}]
+      (println "fooo " ret)
+      
+      ret
+      )
+    (catch Exception e (println e))))
+
+
+
+#_(slot-in-last [{:latitude 10 :longitude 10}
+               {:latitude 14 :longitude 12}
+               {:latitude 12 :longitude 15}
+               {:latitude 13 :longitude 11}]
+              [1 2 0])
+
+
+(defn optimise [matrix route start-idx end-idx iterations]
+  (let [drops (vec (map-indexed (fn [idx x] (assoc x :idx idx)) @drops))
+        matrix (generate-matrix (conj drops hub))
+        new-idx (dec (count drops))
+        hub-idx (count drops)
+        route (:route @best-route)
+        _ (println route)]
+    (reset! best-route
+            (loop [i 0
+                   best (cost-route matrix (insert-at route 0 new-idx) hub-idx hub-idx)]
+              (if (= i (count drops))
+                best
+                (let [new (cost-route matrix (insert-at route i new-idx) hub-idx hub-idx)]
+                  (recur (inc i)
+                         (if (< (:cost new) (:cost best))
+                           new
+                           best))))))))
 
 (comment
   [6 1 7 2 0 5 3 4 8]
@@ -133,9 +190,34 @@
                                    :hub hub})))
 
 
+
 (defmethod handle-event :optimise
   [tube [_ _ reply-v]]
-  (let [drops @drops
+  (try
+    (let [drops (conj (vec (map-indexed (fn [idx x] (assoc x :idx idx)) @drops))
+                      hub)
+          matrix (generate-matrix drops)
+          hub-idx (dec (count drops))
+          indicies (range (dec (count drops)))
+          _ (println "here a")
+          new-route (loop [i 1000
+                           best (build-route matrix drops (shuffle indicies) hub-idx)]
+                      (if (zero? i)
+                        best
+                        (let [new (build-route matrix drops (shuffle indicies) hub-idx)]
+                          (recur (dec i)
+                                 (if (< (:cost new) (:cost best))
+                                   new
+                                   best)))))]
+
+      (println "new-route2" new-route)
+      (reset! best-route new-route)
+      (dispatch tx tube (conj reply-v {:round drops
+                                       :hub hub
+                                       :route (:route new-route)})))
+    (catch Exception e (println e)))
+
+  #_(let [drops @drops
         drops (vec (map-indexed (fn [idx x] (assoc x :idx idx)) drops))
         matrix (generate-matrix (conj drops hub))
         hub-idx (count drops)

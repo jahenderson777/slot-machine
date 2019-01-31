@@ -28,7 +28,7 @@
                    [cider/piggieback "0.3.10"]]
 
     :plugins      [[lein-figwheel "0.5.18"]]}
-
+-
    :prod { }
    :uberjar {:source-paths ["env/prod/clj"]
              :omit-source  true
