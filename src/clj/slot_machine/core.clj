@@ -70,7 +70,7 @@
 
 
 (defn slot-in-last [matrix drops route new-idx hub-idx]
-  (println "slot-in-last" route new-idx hub-idx)
+  ;(println "slot-in-last" route new-idx hub-idx)
   (loop [i 0
          best (cost-route matrix (insert-at route 0 new-idx) hub-idx hub-idx)]
     (if (= i (count route))
@@ -83,16 +83,15 @@
 
 (defn build-route [matrix drops order hub-idx]
   ;(throw (Exception. "sldjfh"))
-  (println "build-route3vxxxx22222" order hub-idx )
+;  (println "build-route3vxxxx22222" order hub-idx )
   (try
     (let [new-route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
           (reduce (fn [route next]
                     (:route (slot-in-last matrix drops route next hub-idx)))
                   [hub-idx]
                   order)
-          ret {:route new-route
-               :cost (cost-route matrix new-route hub-idx hub-idx)}]
-      (println "fooo " ret)
+          ret (cost-route matrix new-route hub-idx hub-idx)]
+   ;   (println "fooo " ret)
       
       ret
       )
@@ -167,7 +166,8 @@
         new-idx (dec (count drops))
         hub-idx (count drops)
         route (:route @best-route)
-        _ (println route)]
+       ; _ (println route)
+        ]
     (reset! best-route
             (loop [i 0
                    best (cost-route matrix (insert-at route 0 new-idx) hub-idx hub-idx)]
@@ -185,7 +185,7 @@
 
 (defmethod handle-event :load-data
   [tube [_ _ reply-v]]
-  (println "Hello " name)
+ ; (println "Hello " name)
   (dispatch tx tube (conj reply-v {:round @drops
                                    :hub hub})))
 
@@ -198,34 +198,23 @@
                       hub)
           matrix (generate-matrix drops)
           hub-idx (dec (count drops))
-          indicies (range (dec (count drops)))
-          _ (println "here a")
-          new-route (loop [i 1000
-                           best (build-route matrix drops (shuffle indicies) hub-idx)]
-                      (if (zero? i)
-                        best
-                        (let [new (build-route matrix drops (shuffle indicies) hub-idx)]
-                          (recur (dec i)
-                                 (if (< (:cost new) (:cost best))
-                                   new
-                                   best)))))]
-
-      (println "new-route2" new-route)
-      (reset! best-route new-route)
-      (dispatch tx tube (conj reply-v {:round drops
-                                       :hub hub
-                                       :route (:route new-route)})))
-    (catch Exception e (println e)))
-
-  #_(let [drops @drops
-        drops (vec (map-indexed (fn [idx x] (assoc x :idx idx)) drops))
-        matrix (generate-matrix (conj drops hub))
-        hub-idx (count drops)
-        {:keys [route] :as best} (optimise matrix (mapv :idx drops) hub-idx hub-idx 2000000)]
-    (reset! best-route best)
-    (dispatch tx tube (conj reply-v {:round drops
-                                     :hub hub
-                                     :route route}))))
+          indicies (range (dec (count drops)))]
+      (loop [i (* hub-idx 50)
+             best (build-route matrix drops (shuffle indicies) hub-idx)]
+        (if (zero? i)
+          best
+          (let [new (build-route matrix drops (shuffle indicies) hub-idx)]
+            (recur (dec i)
+                   (if (< (:cost new) (:cost best))
+                     (do (println i (:cost new) (:route new))
+                         (reset! best-route new)
+                         (dispatch tx tube (conj reply-v {:round drops
+                                                          :hub hub
+                                                          :route (:route new)}))
+                         new)
+                     best))))))
+    (println "done")
+    (catch Exception e (println e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defroutes routes
