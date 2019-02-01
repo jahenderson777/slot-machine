@@ -5,42 +5,34 @@
               [org.httpkit.server :refer [run-server]]
               [pneumatic-tubes.core :refer [receiver transmitter dispatch]]
               [pneumatic-tubes.httpkit :refer [websocket-handler]]
-              [clojure.math.numeric-tower :as math])
-  (:gen-class))
+              [clojure.math.numeric-tower :as math]
+              [slot-machine.util :refer :all])
+    (:gen-class))
 
 (def tx (transmitter))
 (defmulti handle-event (fn [_ [_ event]] event))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn random-drop []
-  {:latitude (rand-int 500)
-   :longitude (rand-int 500)})
+(defn random-location []
+  {:lat (rand-int 500)
+   :lng (rand-int 500)})
 
-(def drops
-  (atom (vec (map-indexed (fn [idx x]
-                            (assoc x :roots_drop_order idx))
-                          (repeatedly 4 random-drop)))))
+(def db (atom {:customers (into {} (for [i (range 4)] [i (random-location)]))
+               :routes [[0 1 2 3]]
+               :selected-route 0
+               :hub (random-location)}))
 
-(def hub (random-drop))
-
-(defn remove-nth [v n]
-  (let [v (into [] v)]
-    [(nth v n)
-     (concat (subvec v 0 n)
-             (subvec v (inc n)))]))
-
-(defn insert-at [row-vec pos item]
-  ;(println row-vec pos item)
-  (apply conj (subvec row-vec 0 pos) item (subvec row-vec pos)))
+(def drops (atom []))
+(def hub nil)
 
 (defn distance-between [x1 y1 x2 y2]
   (math/sqrt (+ (math/expt (- x2 x1) 2)
                 (math/expt (- y2 y1) 2))))
 
-(defn generate-matrix [drops]
-  (vec (for [a drops]
-         (vec (for [b drops]
-                (distance-between (:longitude a) (:latitude a) (:longitude b) (:latitude  b)))))))
+(defn generate-matrix [locations]
+  (vec (for [a locations]
+         (vec (for [b locations]
+                (distance-between (:lng a) (:lat a) (:lng b) (:lat b)))))))
 
 (defn cost-from-a-to-b [matrix a b]
   (nth (nth matrix a)
@@ -68,9 +60,7 @@
                  new
                  best))))))
 
-
 (defn slot-in-last [matrix drops route new-idx hub-idx]
-  ;(println "slot-in-last" route new-idx hub-idx)
   (loop [i 0
          best (cost-route matrix (insert-at route 0 new-idx) hub-idx hub-idx)]
     (if (= i (count route))
@@ -82,29 +72,15 @@
                  best))))))
 
 (defn build-route [matrix drops order hub-idx]
-  ;(throw (Exception. "sldjfh"))
-;  (println "build-route3vxxxx22222" order hub-idx )
   (try
-    (let [new-route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+    (let [new-route
           (reduce (fn [route next]
                     (:route (slot-in-last matrix drops route next hub-idx)))
                   [hub-idx]
                   order)
           ret (cost-route matrix new-route hub-idx hub-idx)]
-   ;   (println "fooo " ret)
-      
-      ret
-      )
+      ret)
     (catch Exception e (println e))))
-
-
-
-#_(slot-in-last [{:latitude 10 :longitude 10}
-               {:latitude 14 :longitude 12}
-               {:latitude 12 :longitude 15}
-               {:latitude 13 :longitude 11}]
-              [1 2 0])
-
 
 (defn optimise [matrix route start-idx end-idx iterations]
   (let [drops (vec (map-indexed (fn [idx x] (assoc x :idx idx)) @drops))
@@ -124,60 +100,83 @@
                            new
                            best))))))))
 
-(comment
-  [6 1 7 2 0 5 3 4 8]
-  (let [
-        drops (vec (map-indexed (fn [idx x] (assoc x :idx idx)) drops))
-        matrix (generate-matrix (conj drops hub))
-        [new-drop some-drops] (remove-nth drops (rand-int (count drops)))
-        hub-idx (count drops)
-        {:keys [route]} (optimise matrix (mapv :idx some-drops) hub-idx hub-idx 200000)
-        new-idx (:idx new-drop)
+(defn disruption-costs [drops route new-idx]
+  ;; (disruption-costs [{:avg-time 10} {:avg-time 20} {:avg-time 30} {:avg-time 40} {:avg-time 25}] [0 1 2 3] 4) 
+  (let [;drops [{:avg-time 10} {:avg-time 20} {:avg-time 30} {:avg-time 40}]
+                                        ;new-idx 1
+                                        ;route [0 1 2 3]
+        num-drops (count route)
+        new-avg-time (:avg-time (nth drops new-idx))]
+    (for [n (range (inc num-drops))]
+      (loop [i 0 cost 0]
+        (if (= i num-drops)
+          cost
+          (let [avg-time (:avg-time (nth drops (nth route i)))]
+                                        ;(println i n)
+            (recur (inc i)
+                   (if avg-time
+                     (+ cost (if (< i n)
+                               (- new-avg-time avg-time)
+                               (- avg-time new-avg-time)))
+                     cost))))))))
 
-        slotted-in
-        (loop [i 0
-               best (cost-route matrix (insert-at route 0 new-idx) hub-idx hub-idx)]
-          (if (= i (count some-drops))
-            best
-            (let [new (cost-route matrix (insert-at route i new-idx) hub-idx hub-idx)]
-              (recur (inc i)
-                     (if (< (:cost new) (:cost best))
-                       new
-                       best)))))]
-    {:new-drop new-drop
-     :hub-idx hub-idx
-     :starting-route route
-     :slotted-in slotted-in})
+(defn selected-route [db]
+  (vec (get-in db [:routes (:selected-route db)])))
 
-  (generate-matrix drops)
+(defmethod handle-event :toggle-customer
+  [tube [e1 e2 id]]
+                                        ;(println "toggling" id)
+  (let [active-on-route (some #(= id %) (spy (selected-route @db)))]
+    (if active-on-route
+      (do (println "is active on route")
+         (swap! db (fn [db]
+                      (update-in db [:routes (:selected-route db)]
+                                 (fn [r] (filter #(not= id %) r)))))
+          (dispatch tx tube [:assoc-in [:data] @db]))
+      (handle-event tube [e1 :add-customer
+                          (get-in @db[:customers id :lng])
+                          (get-in @db[:customers id :lat])]))))
 
-  (distance-between 0 0 2 3)
+(defmethod handle-event :add-customer
+  [tube [_ _ lng lat]]
+  (swap! db (fn [db]
+              (let [new-id (inc (apply max (keys (:customers db))))
+                    new-cust {:lng lng :lat lat}
+                    selected-route (selected-route db)
+                    deliveries (vec (map (fn [id]
+                                           (assoc (get-in db [:customers id]) :id id))
+                                         selected-route))
+                    ids (conj selected-route new-id)
+                    matrix (generate-matrix (conj deliveries new-cust (:hub db)))
+                    current-route (vec (range (count deliveries)))
+                    new-idx (count deliveries)
+                    hub-idx (inc new-idx)
 
-  (math/expt 4 2)
-  (remove-nth [1 2 3 4 5] 3)
+                    result
+                    (loop [i 0
+                           best (cost-route matrix (insert-at current-route 0 new-idx) hub-idx hub-idx)]
+                      (if (= i (count deliveries))
+                        best
+                        (let [new (cost-route matrix (insert-at current-route i new-idx) hub-idx hub-idx)]
+                          (recur (inc i)
+                                 (if (< (:cost new) (:cost best))
+                                   new
+                                   best)))))
 
-  )
+                    route-with-new-cust-slotted-in
+                    (mapv #(nth ids %) (:route result))]
+                (-> db
+                    (assoc-in [:customers new-id] new-cust)
+                    (assoc-in [:routes (:selected-route db)] route-with-new-cust-slotted-in)))))
+                                        ;(? deliveries)
+  #_(reset! best-route
+            )
+  (dispatch tx tube [:assoc-in [:data] @db]))
 
 (defmethod handle-event :add-drop
   [tube [_ _ reply-v longitude latitude]]
   (swap! drops conj {:longitude longitude :latitude latitude})
-  (let [drops (vec (map-indexed (fn [idx x] (assoc x :idx idx)) @drops))
-        matrix (generate-matrix (conj drops hub))
-        new-idx (dec (count drops))
-        hub-idx (count drops)
-        route (:route @best-route)
-       ; _ (println route)
-        ]
-    (reset! best-route
-            (loop [i 0
-                   best (cost-route matrix (insert-at route 0 new-idx) hub-idx hub-idx)]
-              (if (= i (count drops))
-                best
-                (let [new (cost-route matrix (insert-at route i new-idx) hub-idx hub-idx)]
-                  (recur (inc i)
-                         (if (< (:cost new) (:cost best))
-                           new
-                           best)))))))
+  
   (dispatch tx tube (conj reply-v {:round @drops
                                    :hub hub
 
@@ -189,28 +188,35 @@
   (dispatch tx tube (conj reply-v {:round @drops
                                    :hub hub})))
 
-
-
 (defmethod handle-event :optimise
   [tube [_ _ reply-v]]
   (try
-    (let [drops (conj (vec (map-indexed (fn [idx x] (assoc x :idx idx)) @drops))
-                      hub)
-          matrix (generate-matrix drops)
-          hub-idx (dec (count drops))
-          indicies (range (dec (count drops)))]
+    (let [_db @db
+          selected-route (selected-route _db)
+          deliveries (conj
+                      (vec (map (fn [id]
+                                        (assoc (get-in _db [:customers id]) :id id))
+                                selected-route))
+                      (:hub _db))
+          ;ids (conj selected-route new-id)
+
+          ;drops
+          #_(conj (vec (map-indexed (fn [idx x] (assoc x :idx idx)) @drops))
+                hub)
+          matrix (generate-matrix deliveries)
+          hub-idx (dec (count deliveries))
+          indicies (range (dec (count deliveries)))]
       (loop [i (* hub-idx 50)
-             best (build-route matrix drops (shuffle indicies) hub-idx)]
+             best (build-route matrix deliveries (shuffle indicies) hub-idx)]
         (if (zero? i)
           best
-          (let [new (build-route matrix drops (shuffle indicies) hub-idx)]
+          (let [new (build-route matrix deliveries (shuffle indicies) hub-idx)]
             (recur (dec i)
                    (if (< (:cost new) (:cost best))
                      (do (println i (:cost new) (:route new))
-                         (reset! best-route new)
-                         (dispatch tx tube (conj reply-v {:round drops
-                                                          :hub hub
-                                                          :route (:route new)}))
+                         (swap! db assoc-in [:routes (:selected-route _db)]
+                                (map #(nth selected-route %) (pop (:route new))))
+                         (dispatch tx tube [:assoc-in [:data] @db])
                          new)
                      best))))))
     (println "done")
@@ -222,5 +228,5 @@
   (GET "/ws" [] (websocket-handler (receiver {:server #'handle-event})))
   (resources "/"))
 
-(defn -main [& args]q
+(defn -main [& args]
   (def stop-server (run-server (bound-fn [req] (routes req)) {:port 9090})))

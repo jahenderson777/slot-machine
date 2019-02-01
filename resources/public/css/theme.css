@@ -1,3 +1,7 @@
 body {
     padding-top: 40px;
 }
+
+circle.pin:hover {
+    fill: #0F0;
+}

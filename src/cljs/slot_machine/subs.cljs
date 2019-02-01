@@ -11,3 +11,8 @@
  :get-in
  (fn [db [_ path]]
    (get-in db path)))
+
+(reg-sub
+ :selected-route
+ (fn [db [_]]
+   (get-in db [:data :routes (get-in db [:data :selected-route])])))
