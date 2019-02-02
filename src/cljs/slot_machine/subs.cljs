@@ -13,6 +13,6 @@
    (get-in db path)))
 
 (reg-sub
- :selected-route
+ :current-route
  (fn [db [_]]
-   (get-in db [:data :routes (get-in db [:data :selected-route])])))
+   (last (get-in db [:data :routes]))))

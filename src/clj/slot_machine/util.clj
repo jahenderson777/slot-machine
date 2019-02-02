@@ -1,5 +1,10 @@
 (ns slot-machine.util
-  (:require [clojure.set :as set]))
+  (:require [clojure.set :as set]
+            [clojure.math.numeric-tower :as math]))
+
+(defn distance-between [x1 y1 x2 y2]
+  (math/sqrt (+ (math/expt (- x2 x1) 2)
+                (math/expt (- y2 y1) 2))))
 
 (defn remove-nth [v n]
   (let [v (into [] v)]
@@ -9,6 +14,9 @@
 
 (defn insert-at [row-vec pos item]
   (apply conj (subvec row-vec 0 pos) item (subvec row-vec pos)))
+
+(defn last-idx [coll]
+  (dec (count coll)))
 
 (defmacro spy [x]
   (let [line (:line (meta &form))

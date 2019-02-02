@@ -39,7 +39,7 @@
                                     x (- (.-clientX evt) (.-left dim))
                                     y (- (.-clientY evt) (.-top dim))]
                                 (dispatch [:server :add-customer x (- h2 y)])))}
-     (let [route (<- :selected-route)]
+     (let [route (<- :current-route)]
        ;(println "route=" route)
        (doall (for [q (range (dec (count route)))]
                 (let [this (get drops (nth route q))
@@ -166,5 +166,7 @@
           "load data"]]
    [:div [:a {:on-click #(dispatch [:server :optimise [:assoc-in [:data]]])}
           "optimise"]]
+   [:div [:a {:on-click #(dispatch [:server :new-route [:assoc-in [:data]]])}
+          "new week"]]
    ;[:pre (with-out-str (cljs.pprint/pprint (<- :get-in [])))]
    ])
