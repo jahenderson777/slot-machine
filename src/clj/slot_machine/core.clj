@@ -22,12 +22,12 @@
                 (distance-between (:lng a) (:lat a) (:lng b) (:lat b)))))))
 
 (let [hub (random-location)
-      customers (for [i (range 4)] (assoc (random-location) :id i))]
+      customers (vec (for [i (range 4)] (assoc (random-location) :id i)))]
   (def db (atom {:customers customers
                  :matrix (calc-matrix (conj customers hub))
                  :routes [{:route [0 1 2 3]
                            :time 10
-                           :cost 10
+                           :cost 1000000
                            :disruption 0}]
                  :hub (random-location)})))
 
@@ -35,7 +35,9 @@
   (nth (nth matrix a) b))
 
 (defn cost-route [matrix route]
-  (let [hub-idx (last-idx (first matrix))]
+  (let [hub-idx (last-idx (first matrix))
+      ;  _ (spy [route])
+        ]
     (-> (reduce (fn [{:keys [cost last-idx times] :as m} next-idx]
                   (let [c (+ cost (cost-from-a-to-b matrix last-idx next-idx))]
                     (assoc! m :cost c
@@ -100,10 +102,10 @@
           (recur (dec i)
                  (if (< (:cost new) (:cost best))
                    (do (spy [i (:cost new) (:route new)])
-                       #_(swap! db update :routes
+                       (swap! db update :routes
                               (fn [routes]
                                 (conj (pop routes)
-                                      (mapv #(nth current-route %) (pop new)))))
+                                      (update new :route pop))))
                        (when tube (dispatch tx tube [:assoc-in [:data] @db]))
                        new)
                    best))))))
@@ -126,17 +128,22 @@
 (defmethod handle-event :add-customer
   [tube [_ _ lng lat]]
   (swap! db (fn [db]
-              (let [new-id (inc (count (:customers db)))
-                    new-cust {:lng lng :lat lat}
-                    current-route (current-route db)
-                    db (update :customers conj new-cust)
-                    db (update :matrix )
+              (let [new-id (count (:customers db))
+                    new-cust {:lng lng :lat lat :id new-id}
+                    db (update db :customers conj new-cust)
+                    db (assoc db :matrix (calc-matrix (conj (:customers db) (:hub db))))
+
+                    _ (println "sdlfkjsldkf2..")
+                    _ (println (current-route db))
+                    - (println "lskjlk")
 
                     route-with-new-cust-slotted-in
-                    (slot-in-idx (:matrix db)
-                                 (current-route db))]
+                    (spy (slot-in-idx (:matrix db)
+                                      (current-route db)
+                                      (last-idx (:customers db))))]
+                
                 (-> db
-                    (assoc-in [:customers new-id] new-cust)
+                    ;(assoc-in [:customers new-id] new-cust)
                     (assoc-in [:routes (last-idx (:routes db))]
                               route-with-new-cust-slotted-in)))))
   (dispatch tx tube [:assoc-in [:data] @db]))
@@ -148,7 +155,7 @@
               (update db :routes #(conj % (last %)))))
   (dispatch tx tube [:assoc-in [:data] @db]))
 
-(defmethod handle-event :load-data
+#_(defmethod handle-event :load-data
   [tube [_ _ reply-v]]
  ; (println "Hello " name)
   (dispatch tx tube (conj reply-v {:round @drops
@@ -159,7 +166,8 @@
 
 (defmethod handle-event :optimise
   [tube [_ _ reply-v]]
-  (.start (Thread. #(optimise tube))))
+  (let [_db @db]
+    (.start (Thread. #(optimise tube (:matrix _db) (last (:routes _db)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defroutes routes

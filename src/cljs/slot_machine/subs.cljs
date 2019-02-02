@@ -15,4 +15,4 @@
 (reg-sub
  :current-route
  (fn [db [_]]
-   (last (get-in db [:data :routes]))))
+   (:route (last (get-in db [:data :routes])))))

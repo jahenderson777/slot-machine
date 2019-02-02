@@ -40,16 +40,17 @@
                                     y (- (.-clientY evt) (.-top dim))]
                                 (dispatch [:server :add-customer x (- h2 y)])))}
      (let [route (<- :current-route)]
-       ;(println "route=" route)
+       (println "route=" route)
        (doall (for [q (range (dec (count route)))]
                 (let [this (get drops (nth route q))
                       next (get drops (nth route (inc q)))]
+                  (println this next)
                   ^{:key q}
                   [:line {:x1 (:lng this) :y1 (- h2 (:lat this))
                           :x2 (:lng next) :y2 (- h2 (:lat next))
                           :stroke-width 3
                           :stroke "green"}]))))
-     (doall (for [[id {:keys [lat lng] :as drop}] drops]
+     (doall (for [{:keys [id lat lng] :as drop} drops]
               ^{:key id}
               [map-pin lng (- h2 lat) id]))
      (let [{:keys [lat lng]} (<- :get-in [:data :hub])]
