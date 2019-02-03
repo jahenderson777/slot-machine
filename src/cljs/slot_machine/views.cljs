@@ -163,11 +163,28 @@
                                     }]
                   }}]}]
    [svg-map]
-   [:div [:a {:on-click #(dispatch [:server :load-data [:assoc-in [:data]]])}
-          "load data"]]
-   [:div [:a {:on-click #(dispatch [:server :optimise [:assoc-in [:data]]])}
-          "optimise"]]
-   [:div [:a {:on-click #(dispatch [:server :new-route [:assoc-in [:data]]])}
-          "new week"]]
+   [:div
+    [:h3 "Route costs"]
+    [:div "Time = " (:cost (last (<- :get-in [:data :routes])))]
+    [:div "Disruption (mean deviation from target time) = " (:disruption (last (<- :get-in [:data :routes])))]]
+   [:div.slidecontainer
+    [:h3 "Anti-disruption slider"]
+    [:span (<- :get-in [:data :anti-disrupt])]
+    [:input.slider {:type "range"
+             :min 0
+             :max 110
+             ;:value 
+             :on-change (fn [e]
+                          (dispatch [:server :set-anti-disrupt (* 0.1 (js/parseInt (.-target.value e)))]))
+             }]]
+   [:div 
+    [:button {:class "btn btn-primary"
+              :type "button"
+              :on-click #(dispatch [:server :optimise [:assoc-in [:data]]])}
+     "optimise"]
+    [:button {:class "btn btn-primary"
+              :type "button"
+              :on-click #(dispatch [:server :new-route [:assoc-in [:data]]])}
+     "next week"]]
    ;[:pre (with-out-str (cljs.pprint/pprint (<- :get-in [])))]
    ])
