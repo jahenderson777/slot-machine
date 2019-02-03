@@ -50,3 +50,42 @@
   [x before after]
   (let [[a _ _] (clojure.data/diff x after)]
     (recursive-diff-merge a before)))
+
+
+(defn find-nth [pred coll]
+  (loop [i 0]
+    (if (= i (count coll))
+      nil
+      (if (pred (nth coll i))
+        i
+        (recur (inc i))))))
+
+(defn quantile
+  ([p vs]
+   (let [svs (sort vs)]
+     (quantile p (count vs) svs (first svs) (last svs))))
+  ([p c svs mn mx]
+   (let [pic (* p (inc c))
+         k (int pic)
+         d (- pic k)
+         ndk (if (zero? k) mn (nth svs (dec k)))]
+     (cond
+       (zero? k) mn
+       (= c (dec k)) mx
+       (= c k) mx
+       :else (+ ndk (* d (- (nth svs k) ndk)))))))
+
+(defn median
+  ([vs] (quantile 0.5 vs))
+  ([sz svs mn mx] (quantile 0.5 sz svs mn mx)))
+
+(defn mean
+  ([vs] (mean (reduce + vs) (count vs)))
+  ([sm sz] (/ sm sz)))
+
+(defn standard-deviation
+  ([vs]
+   (standard-deviation vs (count vs) (mean vs)))
+  ([vs sz u]
+   (Math/sqrt (/ (reduce + (map #(Math/pow (- % u) 2) vs))
+                 sz))))

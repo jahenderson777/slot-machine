@@ -73,19 +73,38 @@
           {:route [(last-idx (first matrix))]}
           order))
 
-(defn disruption-costs [avg-times route new-avg-time]
+(defn cust-target-times [customers routes min-deliveries num-last-routes]
+  (for [id (range (count customers))]
+    (let [times
+          (reduce (fn [cust-times r]
+                    (if-let [n (find-nth #(= % id) (:route r))]
+                      (conj cust-times (nth (:times r) n))
+                      cust-times))
+                  []
+                  (take num-last-routes (reverse routes)))]
+      (if (>= (count times) min-deliveries)
+        (median times)))))
+
+(defn apply-target-times [db]
+  (update db :customers (fn [customers]
+                          (let [target-times (cust-target-times customers (:routes db) 1 7)]
+                            (map-indexed (fn [idx c]
+                                           (assoc c :target-time (nth target-times idx)))
+                                  customers)))))
+
+(defn disruption-costs [target-times route new-target-time]
   (let [num-drops (count route)]
     (->> (range (inc num-drops))
          (mapv (fn [n]
                  (loop [i 0 cost 0]
                    (if (= i num-drops)
                      cost
-                     (let [avg-time (nth avg-times (nth route i))]
+                     (let [target-time (nth target-times (nth route i))]
                        (recur (inc i)
-                              (if avg-time
+                              (if target-time
                                 (+ cost (if (< i n)
-                                          (- new-avg-time avg-time)
-                                          (- avg-time new-avg-time)))
+                                          (- new-target-time target-time)
+                                          (- target-time new-target-time)))
                                 cost))))))))))
 
 (defn current-route [db]
