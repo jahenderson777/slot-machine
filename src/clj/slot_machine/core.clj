@@ -152,19 +152,13 @@
                     db (update db :customers conj new-cust)
                     db (assoc db :matrix (calc-matrix (conj (:customers db) (:hub db))))
 
-                    _ (println "sdlfkjsldkf2..")
-                    _ (println (current-route db))
-                    - (println "lskjlk")
-
                     route-with-new-cust-slotted-in
                     (spy (slot-in-idx (:matrix db)
                                       (current-route db)
                                       (last-idx (:customers db))))]
-                
-                (-> db
-                    ;(assoc-in [:customers new-id] new-cust)
-                    (assoc-in [:routes (last-idx (:routes db))]
-                              route-with-new-cust-slotted-in)))))
+                (assoc-in db
+                          [:routes (last-idx (:routes db))]
+                          route-with-new-cust-slotted-in))))
   (dispatch tx tube [:assoc-in [:data] @db]))
 
 (defmethod handle-event :new-route
@@ -173,15 +167,6 @@
 
               (update db :routes #(conj % (last %)))))
   (dispatch tx tube [:assoc-in [:data] @db]))
-
-#_(defmethod handle-event :load-data
-  [tube [_ _ reply-v]]
- ; (println "Hello " name)
-  (dispatch tx tube (conj reply-v {:round @drops
-                                   :hub hub})))
-
-
-
 
 (defmethod handle-event :optimise
   [tube [_ _ reply-v]]
