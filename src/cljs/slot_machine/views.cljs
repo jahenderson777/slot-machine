@@ -172,10 +172,10 @@
     [:span (<- :get-in [:data :anti-disrupt])]
     [:input.slider {:type "range"
              :min 0
-             :max 110
+             :max 400
              ;:value 
              :on-change (fn [e]
-                          (dispatch [:server :set-anti-disrupt (* 0.1 (js/parseInt (.-target.value e)))]))
+                          (dispatch [:server :set-anti-disrupt (* 0.01 (js/parseInt (.-target.value e)))]))
              }]]
    [:div 
     [:button {:class "btn btn-primary"
@@ -186,5 +186,5 @@
               :type "button"
               :on-click #(dispatch [:server :new-route [:assoc-in [:data]]])}
      "next week"]]
-   ;[:pre (with-out-str (cljs.pprint/pprint (<- :get-in [])))]
+   [:pre (with-out-str (cljs.pprint/pprint (<- :disrupted-customers)))]
    ])

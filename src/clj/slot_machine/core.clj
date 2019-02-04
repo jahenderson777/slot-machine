@@ -77,7 +77,9 @@
                                             (- new-target-time target-time)
                                             (- target-time new-target-time)))
                                   cost)))))))
-           (mapv #(* % anti-disrupt 0.1))))))
+           (mapv #(* % (/ anti-disrupt (* 2 num-drops))))))))
+
+;(disruption-costs [100 220 1000] [0 1 2] 215 1)
 
 (defn slot-in-idx [matrix route new-idx target-times anti-disrupt]
   (let [new-target-time (nth target-times new-idx)
@@ -128,7 +130,7 @@
 (defn optimise [tube matrix route target-times anti-disrupt]
   (let [current-route (:route route)
         hub-idx (last-idx (first matrix))]
-    (loop [i (* hub-idx 14)
+    (loop [i (* (count current-route) 10)
            best route]
       (if (zero? i)
         best
@@ -160,7 +162,8 @@
           (swap! db (fn [db]
                       (update-in db [:routes (last-idx (:routes db))]
                                  (fn [{:keys [route]}]
-                                   (cost-route (:matrix db) (filter #(not= id %) route))))))
+                                   (cost-route (:matrix db) (into [] (filter #(not= id %) route))
+                                               (mapv :target-time (:customers db)))))))
           (dispatch tx tube [:assoc-in [:data] @db]))
       (handle-event tube [e1 :add-customer
                           (get-in @db[:customers id :lng])
@@ -176,14 +179,16 @@
                     target-times (mapv :target-time (:customers db))
 
                     route-with-new-cust-slotted-in
-                    (spy (slot-in-idx (:matrix db)
-                                      (current-route db)
-                                      (last-idx (:customers db))
-                                      target-times
-                                      0))]
+                    (slot-in-idx (:matrix db)
+                                 (current-route db)
+                                 (last-idx (:customers db))
+                                 target-times
+                                 (:anti-disrupt db))
+
+                    costed (cost-route (:matrix db) (:route route-with-new-cust-slotted-in) target-times)]
                 (assoc-in db
                           [:routes (last-idx (:routes db))]
-                          route-with-new-cust-slotted-in))))
+                          costed))))
   (dispatch tx tube [:assoc-in [:data] @db]))
 
 (defmethod handle-event :new-route
