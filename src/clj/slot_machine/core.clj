@@ -119,7 +119,7 @@
 
 (defn apply-target-times [db]
   (update db :customers (fn [customers]
-                          (let [target-times (calc-target-times customers (:routes db) 1 7)]
+                          (let [target-times (calc-target-times customers (:routes db) 2 6)]
                             (into [] (map-indexed (fn [idx c]
                                                     (assoc c :target-time (nth target-times idx)))
                                                   customers))))))
@@ -127,12 +127,14 @@
 (defn current-route [db]
   (vec (get-in db [:routes (last-idx (:routes db)) :route])))
 
-(defn optimise [tube matrix route target-times anti-disrupt]
+(def optimise-run (atom 0))
+
+(defn optimise [tube matrix route target-times anti-disrupt this-run-id]
   (let [current-route (:route route)
         hub-idx (last-idx (first matrix))]
-    (loop [i (* (count current-route) 10)
+    (loop [i (* (count current-route) 30)
            best route]
-      (if (zero? i)
+      (if (or (zero? i) (not= @optimise-run this-run-id))
         best
         (let [new (build-route matrix (shuffle current-route) target-times anti-disrupt)
               new (cost-route matrix (:route new) target-times)]
@@ -203,7 +205,7 @@
   (swap! db (fn [db] (assoc-in db [:routes (last-idx (:routes db)) :cost] 99999999999)))
   (let [_db @db
         target-times (mapv :target-time (:customers _db))]
-    (.start (Thread. #(optimise tube (:matrix _db) (last (:routes _db)) target-times (:anti-disrupt _db))))))
+    (.start (Thread. #(optimise tube (:matrix _db) (last (:routes _db)) target-times (:anti-disrupt _db) (swap! optimise-run inc))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defroutes routes
