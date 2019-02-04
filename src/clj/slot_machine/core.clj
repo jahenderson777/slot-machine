@@ -26,7 +26,7 @@
   (def db (atom {:customers customers
                  :matrix (calc-matrix (conj customers hub))
                  :routes [{:route [0 1 2 3]
-                           :time 10
+                           :times [1 2 3 4]
                            :cost 1000000
                            :disruption 0}]
                  :hub (random-location)})))
@@ -50,14 +50,15 @@
          (assoc! :route route)
          persistent!)))
   ([matrix route target-times]
-   (let [c (cost-route matrix route)]
-     (assoc c :disruption
-            (->> (map-indexed (fn [idx x]
-                                (when-let [target-time (nth target-times x)]
-                                  (Math/abs (- target-time (nth (:times c) idx)))))
-                              (pop route))
-                 (remove nil?)
-                 mean)))))
+   (let [c (cost-route matrix route)
+         d (->> (map-indexed (fn [idx x]
+                               (when-let [target-time (nth target-times x)]
+                                 (Math/abs (- target-time (nth (:times c) idx)))))
+                             (pop route))
+                (remove nil?))]
+     (assoc c :disruption (if (seq d)
+                            (mean d)
+                            0)))))
 
 (defn disruption-costs [target-times route new-target-time anti-disrupt]
   (let [num-drops (count route)
@@ -129,6 +130,9 @@
 
 (def optimise-run (atom 0))
 
+(defn send-db! [tube]
+  (dispatch tx tube [:assoc-in [:data] (dissoc @db :matrix)]))
+
 (defn optimise [tube matrix route target-times anti-disrupt this-run-id]
   (let [current-route (:route route)
         hub-idx (last-idx (first matrix))]
@@ -141,12 +145,12 @@
           (recur (dec i)
                  (if (< (+ (:cost new) (* anti-disrupt (:disruption new)))
                         (+ (:cost best) (* anti-disrupt (:disruption best))))
-                   (do (spy [i (:cost new) (:disruption new) (:route new)])
+                   (do (spy [i (:cost new) (:disruption new)])
                        (swap! db update :routes
                               (fn [routes]
                                 (conj (pop routes)
                                       (update new :route pop))))
-                       (when tube (dispatch tx tube [:assoc-in [:data] @db]))
+                       (when tube (send-db! tube))
                        new)
                    best))))))
   (println "done"))
@@ -171,6 +175,8 @@
                           (get-in @db[:customers id :lng])
                           (get-in @db[:customers id :lat])]))))
 
+
+
 (defmethod handle-event :add-customer
   [tube [_ _ lng lat]]
   (swap! db (fn [db]
@@ -191,14 +197,63 @@
                 (assoc-in db
                           [:routes (last-idx (:routes db))]
                           costed))))
-  (dispatch tx tube [:assoc-in [:data] @db]))
+  (send-db! tube))
 
 (defmethod handle-event :new-route
   [tube _]
   (swap! db (fn [db]
               (-> (apply-target-times db)
                   (update :routes #(conj % (last %))))))
-  (dispatch tx tube [:assoc-in [:data] @db]))
+  (send-db! tube))
+
+(defmethod handle-event :set-anti-disrupt
+  [tube [_ _ anti-disrupt]]
+  (swap! db (fn [db]
+              (assoc db :anti-disrupt anti-disrupt))))
+
+(defmethod handle-event :toggle-customer
+  [tube [e1 e2 id]]
+  (let [active-on-route (some #(= id %) (current-route @db))]
+    (if active-on-route
+      (do (println "is active on route")
+          (swap! db (fn [db]
+                      (update-in db [:routes (last-idx (:routes db))]
+                                 (fn [{:keys [route]}]
+                                   (cost-route (:matrix db) (into [] (filter #(not= id %) route))
+                                               (mapv :target-time (:customers db)))))))
+          (send-db! tube))
+      (handle-event tube [e1 :add-customer
+                          (get-in @db[:customers id :lng])
+                          (get-in @db[:customers id :lat])]))))
+
+(let [db @db
+      ]
+  (for [i-cust (range (last-idx (:customers db)))]
+    (for [r (:routes db)
+          :let [n (find-nth #(= i-cust %) (:route r))]]
+      (when n (nth (:times r) n)))))
+
+(defmethod handle-event :add-customer
+  [tube [_ _ lng lat]]
+  (swap! db (fn [db]
+              (let [new-id (count (:customers db))
+                    new-cust {:lng lng :lat lat :id new-id}
+                    db (update db :customers conj new-cust)
+                    db (assoc db :matrix (calc-matrix (conj (:customers db) (:hub db))))
+                    target-times (mapv :target-time (:customers db))
+
+                    route-with-new-cust-slotted-in
+                    (slot-in-idx (:matrix db)
+                                 (current-route db)
+                                 (last-idx (:customers db))
+                                 target-times
+                                 (:anti-disrupt db))
+
+                    costed (cost-route (:matrix db) (:route route-with-new-cust-slotted-in) target-times)]
+                (assoc-in db
+                          [:routes (last-idx (:routes db))]
+                          costed))))
+  (send-db! tube))
 
 (defmethod handle-event :optimise
   [tube [_ _ reply-v]]

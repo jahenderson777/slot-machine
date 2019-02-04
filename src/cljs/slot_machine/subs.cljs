@@ -1,6 +1,7 @@
 (ns slot-machine.subs
   (:require
-   [re-frame.core :refer [reg-sub]]))
+   [re-frame.core :refer [reg-sub]]
+   [clojure.string :as str]))
 
 (reg-sub
  ::name
@@ -35,3 +36,29 @@
                         route)
            (sort-by :abs-deviation >)
            (take 10)))))
+
+(defn find-nth [pred coll]
+  (loop [i 0]
+    (if (= i (count coll))
+      nil
+      (if (pred (nth coll i))
+        i
+        (recur (inc i))))))
+
+(reg-sub
+ :drop-times-paths
+ (fn [db [_]]
+   (println "dtp3")
+   (let [data (:data db)]
+     (for [i-cust (range (dec (count (:customers data))))]
+       (str "M"
+            (.substring
+                  (str/join " " (remove nil?
+                                        (map-indexed
+                                         (fn [idx r]
+                                           (let [n (find-nth #(= i-cust %) (:route r))]
+                                             (when n
+                                               (str "L"
+                                                    (int (* 0.2 (nth (:times r) n))) " " (* idx 20)))))
+                                         (:routes data))))
+                  1))))))

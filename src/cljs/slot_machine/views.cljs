@@ -132,36 +132,41 @@
 #_(defn update-map-button []
   [:button {:type "button" :on-click #(rf/dispatch [:request-event])} "Event"])
 
+(defn hsl [h s l]
+  (str "hsl(" h "," s "%," l "%)"))
+
+(defn rand-hsl []
+  (hsl (rand-int 355) (rand-int 100) 50))
 
 (defn main-panel []
   [:div
-   [:h1 "Slot machine V2"]
+   [:h1 "Slot machine V3"]
    [map-component {:id         "dispatcher-map"
                    :width      "500px" :height "400px"
                    :center     [52.50284 13.44096]
                    :zoom       12
                    :opt-routes [{:points {
-                  "type" "FeatureCollection",
-                  "features" [{
-                                "type" "Feature",
-                                "geometry" {
-                                             "type" "LineString",
-                                             "coordinates" [[-45, 0],[45, 0]]
-                                             },
-                                "properties" {
-                                               "color" "red"
-                                               }
-                                }, {
-                                    "type" "Feature",
-                                    "geometry" {
-                                                 "type" "LineString",
-                                                 "coordinates" [[0, -45],[0, 45]]
-                                                 },
-                                    "properties" {
-                                                   "color" "yellow"
-                                                   }
-                                    }]
-                  }}]}]
+                                          "type" "FeatureCollection",
+                                          "features" [{
+                                                       "type" "Feature",
+                                                       "geometry" {
+                                                                   "type" "LineString",
+                                                                   "coordinates" [[-45, 0],[45, 0]]
+                                                                   },
+                                                       "properties" {
+                                                                     "color" "red"
+                                                                     }
+                                                       }, {
+                                                       "type" "Feature",
+                                                       "geometry" {
+                                                                   "type" "LineString",
+                                                                   "coordinates" [[0, -45],[0, 45]]
+                                                                   },
+                                                       "properties" {
+                                                                     "color" "yellow"
+                                                                     }
+                                                       }]
+                                          }}]}]
    [svg-map]
    [:div
     [:h3 "Route costs"]
@@ -171,12 +176,12 @@
     [:h3 "Anti-disruption slider"]
     [:span (<- :get-in [:data :anti-disrupt])]
     [:input.slider {:type "range"
-             :min 0
-             :max 400
-             ;:value 
-             :on-change (fn [e]
-                          (dispatch [:server :set-anti-disrupt (* 0.01 (js/parseInt (.-target.value e)))]))
-             }]]
+                    :min 0
+                    :max 400
+                                        ;:value 
+                    :on-change (fn [e]
+                                 (dispatch [:server :set-anti-disrupt (* 0.01 (js/parseInt (.-target.value e)))]))
+                    }]]
    [:div 
     [:button {:class "btn btn-primary"
               :type "button"
@@ -186,5 +191,17 @@
               :type "button"
               :on-click #(dispatch [:server :new-route [:assoc-in [:data]]])}
      "next week"]]
-   [:pre (with-out-str (cljs.pprint/pprint (<- :disrupted-customers)))]
+   [:svg {:width 900 :height 700
+          :style {:border "1px solid grey"}}
+    (doall (map-indexed
+            (fn [idx p]
+              ^{:key idx}
+              [:path {:stroke (rand-hsl)
+                      :fill "none"
+                      :d p}])
+            (<- :drop-times-paths)
+            ))]
+   [:pre (str
+          (<- :drop-times-paths)
+          #_(<- :disrupted-customers))]
    ])
